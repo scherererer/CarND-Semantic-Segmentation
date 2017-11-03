@@ -56,8 +56,31 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 	:param num_classes: Number of classes to classify
 	:return: The Tensor for the last layer of output
 	"""
-	# TODO: Implement function
-	return None
+
+	# We append a 1×1 convolution with channel  dimension 21 to predict
+	# scores for each of the PASCAL classes (including background) at each
+	# of the coarse output locations, followed by a deconvolution layer to bi-
+	# linearly upsample the coarse outputs to pixel-dense outputs as described
+	# in Section 3.3.
+
+	output = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), padding='same');
+	#output = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), padding='same',
+	#                          kernel_regulizer=tf.contrib.layers.l2_regulizer(1e-3)) # TODO: Regulizer for every layer?
+	output = tf.layers.conv2d_transpose(output, num_classes, 4, strides=(2, 2), padding='same')
+
+	# Upsample by 2?
+	output = tf.layers.conv2d_transpose(output, num_classes, 4, strides=(2, 2), padding='same')
+
+	l4_1x1 = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1,1), padding='same');
+	output = tf.add(output, l4_1x1)
+	output = tf.layers.conv2d_transpose(output, num_classes, 4, strides=(2, 2), padding='same')
+
+	l3_1x1 = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1,1), padding='same');
+	output = tf.add(output, l3_1x1)
+	output = tf.layers.conv2d_transpose(output, num_classes, 16, strides=(8, 8), padding='same')
+
+	return output;
+
 tests.test_layers(layers)
 
 
@@ -70,8 +93,17 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
 	:param num_classes: Number of classes to classify
 	:return: Tuple of (logits, train_op, cross_entropy_loss)
 	"""
-	# TODO: Implement function
-	return None, None, None
+
+	# Reshape 4D tensor to 2D
+	logits = tf.reshape(nn_last_layer, (-1, num_classes))
+
+	cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label))
+
+	loss_operation = tf.reduce_mean(cross_entropy_loss)
+	optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+	train_op = optimizer.minimize(loss_operation)
+
+	return logits, train_op, cross_entropy_loss
 tests.test_optimize(optimize)
 
 
@@ -118,10 +150,18 @@ def run():
 		# OPTIONAL: Augment Images for better results
 		#  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
+		correct_label = None;
+		learning_rate = 10; # TODO: Tune Me
+		num_classes = 2;
+
 		# TODO: Build NN using load_vgg, layers, and optimize function
 		image_input, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg (sess, vgg_path)
+		nn_last_layer = layers(layer3_out, layer4_out, layer7_out, num_classes);
+
+		logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
 
 		# TODO: Train NN using the train_nn function
+		#train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image, correct_label, keep_prob, learning_rate):
 
 		# TODO: Save inference data using helper.save_inference_samples
 		#  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
