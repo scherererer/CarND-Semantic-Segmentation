@@ -87,9 +87,14 @@ def gen_batch_function(data_folder, image_shape):
                 image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
                 gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)
 
+                # ORIGINAL LOGIC
                 gt_bg = np.all(gt_image == background_color, axis=2)
                 gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
                 gt_image = np.concatenate((gt_bg, np.invert(gt_bg)), axis=2)
+
+                ## NEW LOGIC
+                #gt_image = np.all(gt_image == background_color, axis=2)
+                #gt_image = gt_image.reshape(*gt_image.shape, 1)
 
                 images.append(image)
                 gt_images.append(gt_image)
