@@ -1,4 +1,5 @@
 import os.path
+import time
 import tensorflow as tf
 import helper
 import warnings
@@ -63,22 +64,27 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 	# linearly upsample the coarse outputs to pixel-dense outputs as described
 	# in Section 3.3.
 
+	KERNEL_REGULARIZATION = 1e-3;
+
 	output = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), padding='same',
-	                          kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+	                          kernel_regularizer=tf.contrib.layers.l2_regularizer(KERNEL_REGULARIZATION))
+	output = tf.layers.batch_normalization (output);
 	output = tf.layers.conv2d_transpose(output, num_classes, 4, strides=(2, 2), padding='same',
-	                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+	                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(KERNEL_REGULARIZATION))
 
 	l4_1x1 = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1,1), padding='same',
-	                          kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+	                          kernel_regularizer=tf.contrib.layers.l2_regularizer(KERNEL_REGULARIZATION))
+	l4_1x1 = tf.layers.batch_normalization (l4_1x1);
 	output = tf.add(output, l4_1x1)
 	output = tf.layers.conv2d_transpose(output, num_classes, 4, strides=(2, 2), padding='same',
-	                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+	                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(KERNEL_REGULARIZATION))
 
 	l3_1x1 = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1,1), padding='same',
-	                          kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+	                          kernel_regularizer=tf.contrib.layers.l2_regularizer(KERNEL_REGULARIZATION))
+	l3_1x1 = tf.layers.batch_normalization (l3_1x1);
 	output = tf.add(output, l3_1x1)
 	output = tf.layers.conv2d_transpose(output, num_classes, 16, strides=(8, 8), padding='same',
-	                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+	                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(KERNEL_REGULARIZATION))
 
 	return output;
 
@@ -101,10 +107,6 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
 	#labels = tf.reshape(correct_label, [-1])
 	#logits = tf.Print(logits, ["Logits: ", logits, " Labels: ", labels]);
 
-	print (nn_last_layer, "->", logits);
-	#print (correct_label);
-	#print (correct_label, "->", labels);
-
 	softmax = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels);
 	#softmax = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=labels);
 
@@ -118,7 +120,7 @@ tests.test_optimize(optimize)
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
-             correct_label, keep_prob, learning_rate):
+             correct_label, keep_prob, learning_rate, output_dir=None, saver=None):
 	"""
 	Train neural network and print out the loss during training.
 	:param sess: TF Session
@@ -131,6 +133,8 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 	:param correct_label: TF Placeholder for label images
 	:param keep_prob: TF Placeholder for dropout keep probability
 	:param learning_rate: TF Placeholder for learning rate
+	:param output_dir: Directory to put all output
+	:param saver: Graph saver
 	"""
 
 	#iou, iou_op = tf.metrics.mean_iou(correct_label, cross_entropy_loss, 2)
@@ -146,6 +150,8 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 			#TODO: FIXME
 			#sess.run(iou_op, feed_dict={input_image: image, correct_label: label})
 			#print("Mean IoU =", sess.run(iou))
+		if (saver != None):
+			saver.save(sess, os.path.join(output_dir, "e{}".format (epoch)))
 
 	pass
 tests.test_train_nn(train_nn)
@@ -153,11 +159,16 @@ tests.test_train_nn(train_nn)
 
 def run():
 	num_classes = 2
-	#num_classes = 3
 	image_shape = (160, 576)
 	data_dir = './data'
 	runs_dir = './runs'
 	tests.test_for_kitti_dataset(data_dir)
+
+	# Make folder for current run
+	output_dir = os.path.join(runs_dir, str(time.time()))
+	if os.path.exists(output_dir):
+		shutil.rmtree(output_dir)
+	os.makedirs(output_dir)
 
 	tf.reset_default_graph();
 
@@ -172,8 +183,9 @@ def run():
 	#correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes-1], name="correct_label")
 
 	learning_rate = tf.placeholder(tf.float32, name="learning_rate")
-	epochs = 1; # TODO: Tune Me
-	batch_size = 5; # TODO: Tune Me
+	EPOCHS = 20; # TODO: Tune Me
+	BATCH_SIZE = 8; # TODO: Tune Me
+	#BATCH_SIZE = 12; # TODO: Tune Me
 
 	with tf.Session() as sess:
 		# Path to vgg model
@@ -193,11 +205,13 @@ def run():
 		sess.run(tf.global_variables_initializer());
 		sess.run(tf.local_variables_initializer());
 
+		saver = tf.train.Saver()
+
 		# TODO: Train NN using the train_nn function
-		train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, image_input, correct_label, keep_prob, learning_rate);
+		train_nn(sess, EPOCHS, BATCH_SIZE, get_batches_fn, train_op, cross_entropy_loss, image_input, correct_label, keep_prob, learning_rate, output_dir, saver);
 
 		# TODO: Save inference data using helper.save_inference_samples
-		helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, image_input)
+		helper.save_inference_samples(output_dir, data_dir, sess, image_shape, logits, keep_prob, image_input)
 
 		# OPTIONAL: Apply the trained model to a video
 
