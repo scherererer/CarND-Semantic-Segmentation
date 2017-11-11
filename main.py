@@ -139,19 +139,22 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 
 	#iou, iou_op = tf.metrics.mean_iou(correct_label, cross_entropy_loss, 2)
 	#print (train_op);
+	logfile = open (os.path.join(output_dir, "session.log"), 'w');
 
 	for epoch in range (epochs):
-		for image, label in get_batches_fn(batch_size):
+		loss = 0;
+		for image, label in get_batches_fn(batch_size, epoch > 0):
 			# train_op and cross_entropy_loss
 			_, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: image, correct_label: label, keep_prob: 1.0, learning_rate: 0.0001});
 
-			print ("Epoch {} Loss {}".format(epoch, loss));
-
+			logfile.write ("Epoch {} Loss {}\n".format(epoch, loss));
 			#TODO: FIXME
 			#sess.run(iou_op, feed_dict={input_image: image, correct_label: label})
 			#print("Mean IoU =", sess.run(iou))
 		if (saver != None):
 			saver.save(sess, os.path.join(output_dir, "e{}".format (epoch)))
+
+		print ("Epoch {} Loss {}".format(epoch, loss));
 
 	pass
 tests.test_train_nn(train_nn)
