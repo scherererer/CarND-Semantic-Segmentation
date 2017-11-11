@@ -139,15 +139,24 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 
 	#iou, iou_op = tf.metrics.mean_iou(correct_label, cross_entropy_loss, 2)
 	#print (train_op);
-	logfile = open (os.path.join(output_dir, "session.log"), 'w');
+
+	logfile = None;
+
+	if (output_dir != None):
+		logfile = open (os.path.join(output_dir, "session.csv"), 'w');
+		logfile.write ("Epoch,Batch,Loss\n");
 
 	for epoch in range (epochs):
 		loss = 0;
+		batch = 0;
 		for image, label in get_batches_fn(batch_size, epoch > 0):
 			# train_op and cross_entropy_loss
 			_, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: image, correct_label: label, keep_prob: 1.0, learning_rate: 0.0001});
 
-			logfile.write ("Epoch {} Loss {}\n".format(epoch, loss));
+			if (logfile != None):
+				logfile.write ("{},{},{}\n".format(epoch, batch, loss));
+			batch += 1;
+
 			#TODO: FIXME
 			#sess.run(iou_op, feed_dict={input_image: image, correct_label: label})
 			#print("Mean IoU =", sess.run(iou))
@@ -156,7 +165,8 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 
 		print ("Epoch {} Loss {}".format(epoch, loss));
 
-	pass
+	if (logfile != None):
+		logfile.close ();
 tests.test_train_nn(train_nn)
 
 
@@ -186,9 +196,8 @@ def run():
 	#correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes-1], name="correct_label")
 
 	learning_rate = tf.placeholder(tf.float32, name="learning_rate")
-	EPOCHS = 20; # TODO: Tune Me
-	BATCH_SIZE = 8; # TODO: Tune Me
-	#BATCH_SIZE = 12; # TODO: Tune Me
+	EPOCHS = 20;
+	BATCH_SIZE = 8;
 
 	with tf.Session() as sess:
 		# Path to vgg model

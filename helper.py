@@ -8,6 +8,7 @@ import zipfile
 import time
 import tensorflow as tf
 import cv2
+import math
 from glob import glob
 from urllib.request import urlretrieve
 from tqdm import tqdm
@@ -89,15 +90,30 @@ def gen_batch_function(data_folder, image_shape):
 				image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
 				gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)
 
+				if (mod_level):
+					# adjust lighting randomly
+					image_mod = cv2.cvtColor (image, cv2.COLOR_RGB2HSV);
+					image_mod[:,:,0] = image_mod[:,:,0] * random.uniform (0.5, 1.0);
+					image = cv2.cvtColor (image_mod, cv2.COLOR_HSV2RGB);
+
+					# scale up randomly
+					scale = random.uniform (1.0, 2.0);
+					scaled_size = (int (image_shape[0] * scale), int (image_shape[1] * scale));
+					yoff = int ((scaled_size[0] - image_shape[0]) / 2.0);
+					xoff = int ((scaled_size[1] - image_shape[1]) / 2.0);
+
+					image_mod = scipy.misc.imresize (image, scaled_size);
+					gt_image_mod = scipy.misc.imresize (image, scaled_size);
+					# crop back to our image's size
+					image = image_mod[0:image_shape[0], 0:image_shape[1]];
+					gt_image = gt_image_mod[0:image_shape[0], 0:image_shape[1]];
+					#image = image_mod[yoff:image_shape[0], xoff:image_shape[1]];
+					#gt_image = gt_image_mod[yoff:image_shape[0], xoff:image_shape[1]];
+
 				# ORIGINAL LOGIC
 				gt_bg = np.all(gt_image == background_color, axis=2)
 				gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
 				gt_image = np.concatenate((gt_bg, np.invert(gt_bg)), axis=2)
-
-				if (mod_level):
-					image_mod = cv2.cvtColor (image, cv2.COLOR_RGB2HSV);
-					image_mod[:,:,0] = image_mod[:,:,0] * random.uniform (0.5, 1.0);
-					image = cv2.cvtColor (image_mod, cv2.COLOR_HSV2RGB);
 
 				## NEW LOGIC
 				#gt_image = np.all(gt_image == background_color, axis=2)
