@@ -196,7 +196,7 @@ def run():
 	#correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes-1], name="correct_label")
 
 	learning_rate = tf.placeholder(tf.float32, name="learning_rate")
-	EPOCHS = 20;
+	EPOCHS = 10;
 	BATCH_SIZE = 8;
 
 	with tf.Session() as sess:
